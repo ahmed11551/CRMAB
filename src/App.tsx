@@ -44,6 +44,7 @@ export default function App() {
   const [activeSection, setActiveSection] = useState<Section>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [userName, setUserName] = useState<string>(localStorage.getItem('buildsync_user_name') || 'Аноним');
+  const [copyFeedback, setCopyFeedback] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -69,6 +70,12 @@ export default function App() {
     signOut(auth);
   };
 
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopyFeedback(true);
+    setTimeout(() => setCopyFeedback(false), 2000);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-bg">
@@ -88,7 +95,7 @@ export default function App() {
   ];
 
   return (
-    <div className="flex h-screen bg-bg text-brand font-sans selection:bg-brand selection:text-white flex-col md:flex-row overflow-hidden">
+    <div className="flex min-h-screen w-full bg-bg text-brand font-sans selection:bg-brand selection:text-white flex-col md:flex-row relative">
       {/* Desktop Sidebar */}
       <AnimatePresence mode="wait">
         {isSidebarOpen && (
@@ -125,7 +132,28 @@ export default function App() {
               ))}
             </nav>
 
-            <div className="p-6 border-t-2 border-brand bg-white">
+            <div className="p-6 border-t-2 border-brand bg-white relative">
+              <div className="mb-6 p-4 border-2 border-dashed border-brand/20 bg-brand/5">
+                <div className="text-[8px] font-black uppercase tracking-widest text-brand/40 mb-3 italic">Shared Access</div>
+                <div className="flex gap-2 items-center">
+                  <input 
+                    readOnly
+                    value={window.location.href}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                    className="flex-1 bg-white border-2 border-brand p-2 text-[8px] font-mono truncate uppercase text-brand/60 cursor-pointer focus:ring-0 focus:border-brand"
+                  />
+                  <button 
+                    onClick={handleShare}
+                    className="p-2 bg-brand text-white neo-shadow-sm active:translate-x-0.5 active:translate-y-0.5"
+                  >
+                    {copyFeedback ? <CheckSquare className="w-3 h-3" /> : <Share2 className="w-3 h-3" />}
+                  </button>
+                </div>
+                {copyFeedback && (
+                  <div className="mt-2 text-[8px] font-black uppercase text-brand italic animate-bounce">✓ Ссылка скопирована!</div>
+                )}
+              </div>
+
               <div className="flex items-center gap-3 mb-5 p-3 border-2 border-brand bg-bg/50 group">
                 <div className="w-10 h-10 border-2 border-brand bg-brand text-white flex items-center justify-center font-black">
                   {userName[0]}
@@ -155,8 +183,8 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <main className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0 relative">
-        <header className="h-20 bg-white border-b-2 border-brand flex items-center justify-between px-6 md:px-10 sticky top-0 z-20 w-full shadow-sm">
+      <main className="flex-1 flex flex-col min-w-0 md:h-screen sticky top-0">
+        <header className="h-20 bg-white border-b-2 border-brand flex items-center justify-between px-6 md:px-10 sticky top-0 z-20 w-full shadow-sm flex-shrink-0">
           <div className="flex items-center gap-4 md:gap-6">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -177,14 +205,11 @@ export default function App() {
 
           <div className="flex items-center gap-3 md:gap-6">
             <button 
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.href);
-                alert('Ссылка на общую сессию скопирована!');
-              }}
-              className="hidden sm:flex bg-brand text-white px-4 py-2.5 text-[10px] font-black uppercase tracking-widest italic neo-shadow-sm items-center gap-2"
+              onClick={handleShare}
+              className={`hidden sm:flex px-4 py-2.5 text-[10px] font-black uppercase tracking-widest italic neo-shadow-sm items-center gap-2 transition-all ${copyFeedback ? 'bg-green-600 text-white' : 'bg-brand text-white'}`}
             >
               <Share2 className="w-4 h-4" />
-              <span>Пригласить</span>
+              <span>{copyFeedback ? 'ГОТОВО!' : 'ПРИГЛАСИТЬ'}</span>
             </button>
             <div className="relative group hidden xl:block">
               <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand" />
@@ -207,7 +232,7 @@ export default function App() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-12 relative bg-bg/30">
+        <div className="flex-1 md:overflow-y-auto p-4 md:p-12 relative bg-bg/30 pb-32 md:pb-12">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeSection}
@@ -228,6 +253,9 @@ export default function App() {
           </AnimatePresence>
           <ReminderOverlay />
         </div>
+
+        {/* Mobile Navigation Spacer */}
+        <div className="h-20 md:hidden flex-shrink-0" />
 
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t-2 border-brand flex items-center justify-around h-20 px-4 z-30 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
           {menuItems.slice(0, 4).map((item) => (

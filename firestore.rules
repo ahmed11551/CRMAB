@@ -12,42 +12,16 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
     }
 
-    function isValidContact(data) {
-      return data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
-             data.role is string && (data.role == 'Contractor' || data.role == 'Client' || data.role == 'Team');
-    }
-
     match /contacts/{contactId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidContact(request.resource.data);
-      allow update: if isSignedIn() && isValidContact(request.resource.data) && (
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'role', 'email', 'phone', 'whatsapp', 'telegram', 'address', 'notes'])
-      );
-      allow delete: if isSignedIn();
-    }
-
-    function isValidProject(data) {
-      return data.name is string && data.name.size() > 0 && 
-             data.status in ['Planning', 'In Progress', 'Completed', 'On Hold'];
+      allow read, write: if isSignedIn();
     }
 
     match /projects/{projectId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidProject(request.resource.data);
-      allow update: if isSignedIn() && isValidProject(request.resource.data);
-      allow delete: if isSignedIn();
-    }
-
-    function isValidTask(data) {
-      return data.title is string && data.title.size() > 0 &&
-             data.status in ['Pending', 'In Progress', 'Resolved'];
+      allow read, write: if isSignedIn();
     }
 
     match /tasks/{taskId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidTask(request.resource.data);
-      allow update: if isSignedIn() && isValidTask(request.resource.data);
-      allow delete: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     match /communications/{commId} {
