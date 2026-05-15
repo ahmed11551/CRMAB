@@ -1,0 +1,106 @@
+{
+  "entities": {
+    "Contact": {
+      "title": "Contact",
+      "description": "A contractor, client, or team member.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name" },
+        "role": { "type": "string", "description": "Role (Contractor, Client, etc.)" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "telegram": { "type": "string" },
+        "address": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "role"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "A construction object or project site.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "status": { "type": "string", "enum": ["Planning", "In Progress", "Completed", "On Hold"] },
+        "contractorIds": { "type": "array", "items": { "type": "string" } },
+        "budget": { "type": "number" },
+        "expenses": { "type": "number" },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "status"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A task that can be assigned and resolved.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "assignedTo": { "type": "string", "description": "Contact ID" },
+        "projectId": { "type": "string", "description": "Project ID" },
+        "status": { "type": "string", "enum": ["Pending", "In Progress", "Resolved"] },
+        "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Urgent"] },
+        "dueDate": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "status"]
+    },
+    "Communication": {
+      "title": "Communication",
+      "description": "Log of calls, messages, or emails.",
+      "type": "object",
+      "properties": {
+        "contactId": { "type": "string" },
+        "type": { "type": "string", "enum": ["Call", "WhatsApp", "Telegram", "Email", "Visit"] },
+        "content": { "type": "string" },
+        "sender": { "type": "string", "description": "Who initiated" },
+        "metadata": { "type": "object", "description": "Additional data like call duration" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["contactId", "type", "timestamp"]
+    },
+    "Financial": {
+      "title": "Financial Transaction",
+      "description": "Payments owed or received.",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string" },
+        "contactId": { "type": "string" },
+        "type": { "type": "string", "enum": ["Income", "Expense", "Debt"] },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Paid"] },
+        "date": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["amount", "type", "date"]
+    },
+    "TravelLog": {
+      "title": "Travel Log",
+      "description": "Logs of site visits and travel.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "destination": { "type": "string" },
+        "purpose": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "cost": { "type": "number" }
+      },
+      "required": ["destination", "date"]
+    }
+  },
+  "firestore": {
+    "contacts": { "schema": "Contact", "description": "Construction contractors and clients" },
+    "projects": { "schema": "Project", "description": "Construction sites/projects" },
+    "tasks": { "schema": "Task", "description": "Project tasks" },
+    "communications": { "schema": "Communication", "description": "Communication history" },
+    "financials": { "schema": "Financial", "description": "Financial transactions" },
+    "travelLogs": { "schema": "TravelLog", "description": "Visits history" }
+  }
+}
