@@ -95,31 +95,56 @@ export default function App() {
   ];
 
   return (
-    <div className="flex min-h-screen w-full bg-bg text-brand font-sans selection:bg-brand selection:text-white flex-col md:flex-row relative">
-      {/* Desktop Sidebar */}
+    <div className="flex h-screen w-full bg-bg text-brand font-sans selection:bg-brand selection:text-white flex-col md:flex-row overflow-hidden relative">
+      {/* Mobile Backdrop Overlay */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+            className="md:hidden fixed inset-0 bg-brand/30 backdrop-blur-md z-[40]"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar Overlay for Mobile / Sidebar for Desktop */}
       <AnimatePresence mode="wait">
         {isSidebarOpen && (
           <motion.aside 
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 280, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            className="hidden md:flex bg-white border-r-2 border-brand flex-col overflow-hidden z-30"
+            initial={{ x: -300, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -300, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed md:relative inset-y-0 left-0 w-[280px] bg-white border-r-4 border-brand flex flex-col z-[50] shadow-2xl md:shadow-none"
           >
-            <div className="p-8 border-b-2 border-brand bg-bg">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-brand text-white">
-                  <Construction className="w-8 h-8" />
+            <div className="p-8 border-b-4 border-brand bg-bg">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-brand text-white neo-shadow-sm">
+                    <Construction className="w-8 h-8" />
+                  </div>
+                  <span className="font-black text-2xl tracking-tighter uppercase italic leading-none">BUILDSYNC</span>
                 </div>
-                <span className="font-black text-2xl tracking-tighter uppercase italic">BUILDSYNC</span>
+                <button 
+                  onClick={() => setIsSidebarOpen(false)} 
+                  className="md:hidden p-2 text-brand hover:rotate-90 transition-transform"
+                >
+                  <X className="w-6 h-6" />
+                </button>
               </div>
-              <div className="text-[9px] opacity-60 uppercase tracking-[0.3em] font-black italic">Конструкторский Стек</div>
+              <div className="text-[9px] opacity-60 uppercase tracking-[0.3em] font-black italic">Конструкторский Стек // АКТИВЕН</div>
             </div>
 
-            <nav className="flex-1 p-6 space-y-2 overflow-y-auto">
+            <nav className="flex-1 p-6 space-y-2 overflow-y-auto custom-scrollbar">
               {menuItems.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setActiveSection(item.id as Section)}
+                  onClick={() => {
+                    setActiveSection(item.id as Section);
+                    if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                  }}
                   className={`w-full flex items-center gap-4 px-4 py-4 text-xs font-black transition-all border-2 ${
                     activeSection === item.id 
                     ? 'bg-brand text-white italic border-brand translate-x-2 neo-shadow-sm' 
@@ -132,25 +157,25 @@ export default function App() {
               ))}
             </nav>
 
-            <div className="p-6 border-t-2 border-brand bg-white relative">
-              <div className="mb-6 p-4 border-2 border-dashed border-brand/20 bg-brand/5">
-                <div className="text-[8px] font-black uppercase tracking-widest text-brand/40 mb-3 italic">Shared Access</div>
+            <div className="p-6 border-t-4 border-brand bg-white relative">
+              <div className="mb-6 p-4 border-2 border-dashed border-brand/20 bg-brand/5 rounded-sm">
+                <div className="text-[8px] font-black uppercase tracking-widest text-brand/40 mb-3 italic">Shared Session Link</div>
                 <div className="flex gap-2 items-center">
                   <input 
                     readOnly
-                    value={window.location.href}
+                    value={typeof window !== 'undefined' ? window.location.origin + window.location.pathname : ''}
                     onClick={(e) => (e.target as HTMLInputElement).select()}
                     className="flex-1 bg-white border-2 border-brand p-2 text-[8px] font-mono truncate uppercase text-brand/60 cursor-pointer focus:ring-0 focus:border-brand"
                   />
                   <button 
                     onClick={handleShare}
-                    className="p-2 bg-brand text-white neo-shadow-sm active:translate-x-0.5 active:translate-y-0.5"
+                    className="p-2 bg-brand text-white neo-shadow-sm active:translate-x-0.5 active:translate-y-0.5 transition-all"
                   >
-                    {copyFeedback ? <CheckSquare className="w-3 h-3" /> : <Share2 className="w-3 h-3" />}
+                    {copyFeedback ? <CheckSquare className="w-3 h-3 text-green-400" /> : <Share2 className="w-3 h-3" />}
                   </button>
                 </div>
                 {copyFeedback && (
-                  <div className="mt-2 text-[8px] font-black uppercase text-brand italic animate-bounce">✓ Ссылка скопирована!</div>
+                  <div className="mt-2 text-[8px] font-black uppercase text-green-600 italic animate-bounce">✓ Ссылка в буфере</div>
                 )}
               </div>
 
@@ -158,7 +183,7 @@ export default function App() {
                 <div className="w-10 h-10 border-2 border-brand bg-brand text-white flex items-center justify-center font-black">
                   {userName[0]}
                 </div>
-                <div className="hidden md:flex flex-col flex-1 overflow-hidden">
+                <div className="flex flex-col flex-1 overflow-hidden">
                   <input 
                     type="text" 
                     value={userName}
@@ -183,33 +208,34 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <main className="flex-1 flex flex-col min-w-0 md:h-screen sticky top-0">
-        <header className="h-20 bg-white border-b-2 border-brand flex items-center justify-between px-6 md:px-10 sticky top-0 z-20 w-full shadow-sm flex-shrink-0">
+
+      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative">
+        <header className="h-20 bg-white border-b-4 border-brand flex items-center justify-between px-6 md:px-10 z-30 w-full shadow-sm flex-shrink-0">
           <div className="flex items-center gap-4 md:gap-6">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="hidden md:block p-2 bg-bg border-2 border-brand hover:translate-x-0.5 hover:translate-y-0.5 transition-all active:shadow-none neo-shadow-sm"
+              className="p-2 bg-bg border-2 border-brand hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-none neo-shadow-sm active:shadow-none"
             >
-              {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              <Menu className="w-5 h-5" />
             </button>
-            <div className="md:hidden p-1.5 bg-brand text-white mr-1 border-2 border-brand">
+            <div className="hidden xs:flex p-1.5 bg-brand text-white mr-1 border-2 border-brand">
                <Construction className="w-6 h-6" />
             </div>
             <div className="flex flex-col">
-              <h2 className="text-sm md:text-xl font-black uppercase italic tracking-tighter truncate leading-none">
+              <h2 className="text-xs md:text-xl font-black uppercase italic tracking-tighter truncate leading-none">
                 {menuItems.find(m => m.id === activeSection)?.label}
               </h2>
-              <div className="text-[8px] font-black opacity-30 tracking-[0.2em] italic uppercase mt-1 hidden md:block">Shared Workspace</div>
+              <div className="text-[8px] font-black opacity-30 tracking-[0.2em] italic uppercase mt-1 hidden md:block">Shared Workspace // CLOUD</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 md:gap-6">
+          <div className="flex items-center gap-2 md:gap-4 lg:gap-6">
             <button 
               onClick={handleShare}
-              className={`hidden sm:flex px-4 py-2.5 text-[10px] font-black uppercase tracking-widest italic neo-shadow-sm items-center gap-2 transition-all ${copyFeedback ? 'bg-green-600 text-white' : 'bg-brand text-white'}`}
+              className={`flex px-3 md:px-4 py-2.5 text-[9px] md:text-[10px] font-black uppercase tracking-widest italic neo-shadow-sm items-center gap-2 transition-all ${copyFeedback ? 'bg-green-600 text-white' : 'bg-brand text-white'} hover:translate-x-0.5 hover:translate-y-0.5 active:shadow-none`}
             >
               <Share2 className="w-4 h-4" />
-              <span>{copyFeedback ? 'ГОТОВО!' : 'ПРИГЛАСИТЬ'}</span>
+              <span className="hidden sm:inline">{copyFeedback ? 'ГОТОВО' : 'ПРИГЛАСИТЬ'}</span>
             </button>
             <div className="relative group hidden xl:block">
               <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand" />
@@ -232,7 +258,8 @@ export default function App() {
           </div>
         </header>
 
-        <div className="flex-1 md:overflow-y-auto p-4 md:p-12 relative bg-bg/30 pb-32 md:pb-12">
+        <div className="flex-1 overflow-y-auto p-4 md:p-12 relative bg-bg/30 pb-32 md:pb-12 border-t-2 border-brand/5 custom-scrollbar scroll-smooth">
+          <div className="absolute top-0 right-0 p-2 text-[7px] text-gray-300 font-mono hidden md:block">BUILD_ID: AI_AG_LITE</div>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeSection}
