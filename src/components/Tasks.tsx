@@ -4,7 +4,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase.ts';
 import { Plus, CheckSquare, Clock, AlertCircle, User, Construction, Tag, Trash2, Search, X } from 'lucide-react';
 import { CRMTask, Contact, Project } from '../types.ts';
 
-export default function Tasks() {
+export default function Tasks({ userName }: { userName?: string }) {
   const [tasks, setTasks] = useState<CRMTask[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -69,6 +69,7 @@ export default function Tasks() {
       await addDoc(collection(db, path), {
         ...newTask,
         reminderDismissed: false,
+        createdBy: userName || 'Аноним',
         createdAt: serverTimestamp()
       });
       setIsAdding(false);
@@ -290,7 +291,11 @@ export default function Tasks() {
                         </button>
                      </div>
                    )}
-                   <div className="hidden md:flex items-center gap-2.5 ml-auto italic border-l-2 border-brand/10 pl-6">
+                   <div className="hidden md:flex items-center gap-2.5 ml-auto italic border-l-2 border-brand/10 pl-6 text-gray-400">
+                      <User className="w-4 h-4" />
+                      <span className="max-w-[100px] truncate">{task.createdBy || 'АНОНИМ'}</span>
+                   </div>
+                   <div className="hidden md:flex items-center gap-2.5 ml-4 italic border-l-2 border-brand/10 pl-6 text-gray-400">
                       <Clock className="w-4 h-4" />
                       {task.createdAt ? new Date((task.createdAt as any).toDate()).toLocaleDateString() : 'Н/Д'}
                    </div>

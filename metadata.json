@@ -1,6 +1,6 @@
 {
   "name": "BuildSync CRM",
-  "description": "Полнофункциональная CRM-платформа для строительного бизнеса: управление проектами, персоналом, финансами и интеграция с Telegram.",
+  "description": "Полнофункциональная CRM-платформа для строительного бизнеса: управление проектами, персоналом, финансами и оперативная аналитика.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

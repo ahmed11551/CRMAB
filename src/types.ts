@@ -42,6 +42,7 @@ export interface CRMTask {
   dueDate?: string;
   reminderAt?: string; // ISO string with time
   reminderDismissed?: boolean;
+  createdBy?: string;
   createdAt: string;
 }
 

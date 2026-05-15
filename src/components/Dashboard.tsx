@@ -87,14 +87,6 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (s: any) => voi
     { label: 'БАЛАНС СРЕДСТВ', value: `${stats.totalBalance.toLocaleString()} ₽`, icon: DollarSign, color: 'text-green-600', trend: 'ФИНАНСОВЫЙ КОНТРОЛЬ' },
   ];
 
-  const handleSetupBot = async () => {
-    try {
-      const resp = await fetch('/api/telegram/setup');
-      const data = await resp.json();
-      alert('Telegram Бота: ' + (data.telegram_response?.ok ? 'Настроен успешно!' : 'Ошибка настройки.'));
-    } catch (err) { alert('Ошибка при соединении с сервером'); }
-  };
-
   return (
     <div className="space-y-10 md:space-y-16 pb-24 md:pb-6 px-1 md:px-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b-8 border-brand pb-8 relative overflow-hidden">
@@ -112,12 +104,6 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (s: any) => voi
           </div>
         </div>
         <div className="flex flex-wrap gap-4 w-full md:w-auto relative z-10">
-           <button 
-             onClick={handleSetupBot}
-             className="bg-white text-brand border-4 border-brand px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-[0.2em] transform hover:rotate-0 transition-all active:scale-95 italic neo-shadow shadow-brand-strong"
-           >
-             СИНХРОНИЗАЦИЯ ТГ БОТА
-           </button>
            <div className="flex-1 md:flex-none bg-brand text-white px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-center italic shadow-xl flex items-center gap-2">
             <Zap className="w-4 h-4 fill-current" />
             СТАТУС: {healthStatus?.status === 'ok' ? 'НОМИНАЛЬНЫЙ' : 'ИНИЦИАЛИЗАЦИЯ...'}
@@ -129,16 +115,12 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (s: any) => voi
       </div>
 
       {healthStatus && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white border-4 border-brand p-4 neo-shadow-sm italic font-black uppercase text-[9px] tracking-widest">
-           <div className="flex items-center gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white border-4 border-brand p-4 neo-shadow-sm italic font-black uppercase text-[9px] tracking-widest text-center">
+           <div className="flex items-center justify-center gap-3">
              <div className={`w-3 h-3 rounded-full ${healthStatus.firebase?.admin ? 'bg-green-500' : 'bg-red-500'}`}></div>
              БАЗА ДАННЫХ: {healthStatus.firebase?.admin ? 'ПОДКЛЮЧЕНО' : 'ОШИБКА'}
            </div>
-           <div className="flex items-center gap-3">
-             <div className={`w-3 h-3 rounded-full ${healthStatus.telegram?.tokenStatus?.includes('Verified') ? 'bg-green-500' : 'bg-red-500'}`}></div>
-             ТГ БОТ: {healthStatus.telegram?.tokenStatus || 'ПРОВЕРКА...'}
-           </div>
-           <div className="flex items-center gap-3">
+           <div className="flex items-center justify-center gap-3">
              <div className={`w-3 h-3 rounded-full ${healthStatus.ai?.configured ? 'bg-green-500' : 'bg-red-500'}`}></div>
              AI ЯДРО: {healthStatus.ai?.configured ? 'АКТИВНО' : 'НЕ НАСТРОЕНО'}
            </div>

@@ -72,8 +72,8 @@ service cloud.firestore {
     }
     
     match /registrations/{regId} {
-      allow read: if isSignedIn();
-      allow create: if true; // Allowed from server-side as well, but this is client SDK
+      allow read: if isSignedIn(); // We want to allow queries by phoneNumber
+      allow create: if true; 
     }
     
     match /users/{userId} {

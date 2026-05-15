@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   Users, 
   Construction, 
@@ -12,16 +13,17 @@ import {
   Menu,
   X,
   Search,
-  Bell
+  Bell,
+  Share2
 } from 'lucide-react';
 import { auth, db } from './lib/firebase.ts';
 import { 
-  signInWithPopup, 
-  GoogleAuthProvider, 
+  signInAnonymously, 
   onAuthStateChanged, 
   User, 
   signOut 
 } from 'firebase/auth';
+import { collection, query, where, getDocs, doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 
 // Components (I will define these next)
@@ -32,115 +34,45 @@ import Tasks from './components/Tasks.tsx';
 import CommunicationLogs from './components/CommunicationLogs.tsx';
 import Financials from './components/Financials.tsx';
 import TravelLogs from './components/TravelLogs.tsx';
-import Registrations from './components/Registrations.tsx';
 import ReminderOverlay from './components/ReminderOverlay.tsx';
 
-type Section = 'dashboard' | 'contacts' | 'projects' | 'tasks' | 'communication' | 'financials' | 'travel' | 'registrations';
+type Section = 'dashboard' | 'contacts' | 'projects' | 'tasks' | 'communication' | 'financials' | 'travel';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<Section>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [userName, setUserName] = useState<string>(localStorage.getItem('buildsync_user_name') || 'Аноним');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      if (!u) {
+        try {
+          await signInAnonymously(auth);
+        } catch (err) {
+          console.error("Anonymous login failed:", err);
+        }
+      }
       setUser(u);
       setLoading(false);
     });
     return unsubscribe;
   }, []);
 
-  const handleLogin = async () => {
-    try {
-      const result = await signInWithPopup(auth, new GoogleAuthProvider());
-      if (result.user) {
-        console.log("Logged in:", result.user.email);
-        
-        // Sync user profile to Firestore
-        const { doc, setDoc, getDoc, serverTimestamp } = await import('firebase/firestore');
-        const userRef = doc(db, 'users', result.user.uid);
-        
-        // Only set if it doesn't exist or needs update
-        const userSnap = await getDoc(userRef);
-        if (!userSnap.exists()) {
-          await setDoc(userRef, {
-            uid: result.user.uid,
-            displayName: result.user.displayName,
-            email: result.user.email,
-            photoURL: result.user.photoURL,
-            createdAt: serverTimestamp(),
-            role: 'User'
-          }, { merge: true });
-        }
-      }
-    } catch (err: any) {
-      console.error("Login failed:", err);
-      let errorMsg = "Ошибка входа. ";
-      if (err.code === 'auth/popup-closed-by-user') {
-        errorMsg += "Окно авторизации было закрыто. Пожалуйста, завершите вход в появившемся окне.";
-      } else if (err.code === 'auth/cancelled-popup-request') {
-        return; // Ignore duplicate popup requests
-      } else if (err.code === 'auth/popup-blocked') {
-        errorMsg += "Всплывающее окно заблокировано вашим браузером. Пожалуйста, разрешите всплывающие окна для этого сайта.";
-      } else {
-        errorMsg += err.message + "\nПопробуйте открыть приложение в новом окне (кнопка в правом верхнем углу).";
-      }
-      alert(errorMsg);
-    }
+  const handleUpdateName = (name: string) => {
+    setUserName(name);
+    localStorage.setItem('buildsync_user_name', name);
   };
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = () => {
+    signOut(auth);
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-bg">
         <div className="text-xl font-mono animate-pulse uppercase tracking-[0.2em] font-black">Загрузка системы BuildSync...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-bg font-sans p-4">
-        <div className="w-full max-w-md bg-white border-2 border-brand p-10 neo-shadow transform -rotate-1 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-brand/5 rotate-45 translate-x-16 -translate-y-16"></div>
-          
-          <Construction className="w-16 h-16 mb-8 text-brand relative z-10" />
-          <h1 className="text-4xl font-black mb-3 tracking-tighter uppercase italic leading-none relative z-10">BuildSync CRM</h1>
-          <p className="text-sm text-gray-600 mb-10 leading-relaxed font-medium relative z-10">
-            Для входа в систему и автоматической регистрации используйте ваш корпоративный или личный Google-аккаунт.
-          </p>
-
-          <button 
-            onClick={handleLogin}
-            className="w-full bg-brand text-white py-5 px-8 hover:bg-gray-800 transition-all flex items-center justify-center gap-3 group font-black tracking-widest uppercase italic neo-shadow-sm active:translate-x-1 active:translate-y-1 active:shadow-none mb-4 relative z-10"
-          >
-            Войти через Google
-            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-          </button>
-
-          <p className="text-[10px] text-center mb-10 font-bold uppercase italic text-red-600 bg-red-50 p-3 border-2 border-red-200">
-            ⚠️ Если окно входа не открывается, нажмите кнопку "Открыть в новом окне" в правом верхнем углу экрана.
-          </p>
-
-          <div className="space-y-4 p-5 bg-gray-50 border-2 border-dashed border-brand/20 relative z-10">
-             <h4 className="text-[10px] font-black uppercase tracking-widest text-brand italic">Как это работает?</h4>
-             <ul className="text-[10px] space-y-2 font-bold text-gray-500 uppercase italic">
-               <li className="flex gap-2"><span>1.</span> <span>Авторизация через Google API</span></li>
-               <li className="flex gap-2"><span>2.</span> <span>Автоматическое создание профиля</span></li>
-               <li className="flex gap-2"><span>3.</span> <span>Доступ к объектам и журналам 24/7</span></li>
-               <li className="flex gap-2 pt-3 border-t border-brand/10">
-                 <MessageSquare className="w-4 h-4 text-brand" />
-                 <span>Или отправьте /start боту для регистрации</span>
-               </li>
-             </ul>
-          </div>
-
-          <div className="mt-10 pt-6 border-t-2 border-brand text-[10px] uppercase tracking-[0.3em] font-black text-gray-400 italic">
-            Система v1.2.0 // Слой Авторизации
-          </div>
-        </div>
       </div>
     );
   }
@@ -153,7 +85,6 @@ export default function App() {
     { id: 'communication', label: 'Связь', icon: MessageSquare },
     { id: 'financials', label: 'Финансы', icon: DollarSign },
     { id: 'travel', label: 'Поездки', icon: Plane },
-    { id: 'registrations', label: 'Регистрации ТГ', icon: Users },
   ];
 
   return (
@@ -195,11 +126,21 @@ export default function App() {
             </nav>
 
             <div className="p-6 border-t-2 border-brand bg-white">
-              <div className="flex items-center gap-3 mb-5 p-3 border-2 border-brand bg-bg/50">
-                <img src={user.photoURL || ''} alt="" className="w-10 h-10 border-2 border-brand" />
-                <div className="flex-1 overflow-hidden">
-                  <div className="text-[10px] font-black truncate uppercase leading-tight">{user.displayName}</div>
-                  <div className="text-[8px] opacity-60 truncate font-mono uppercase font-bold">{user.email}</div>
+              <div className="flex items-center gap-3 mb-5 p-3 border-2 border-brand bg-bg/50 group">
+                <div className="w-10 h-10 border-2 border-brand bg-brand text-white flex items-center justify-center font-black">
+                  {userName[0]}
+                </div>
+                <div className="hidden md:flex flex-col flex-1 overflow-hidden">
+                  <input 
+                    type="text" 
+                    value={userName}
+                    onChange={(e) => handleUpdateName(e.target.value)}
+                    className="text-[10px] font-black uppercase leading-tight bg-transparent border-none outline-none focus:ring-0 w-full"
+                    placeholder="ВАШЕ ИМЯ"
+                  />
+                  <div className="text-[8px] opacity-60 truncate font-mono uppercase font-bold text-brand italic">
+                    ID: {user?.uid.slice(0, 8)}
+                  </div>
                 </div>
               </div>
               <button 
@@ -207,7 +148,7 @@ export default function App() {
                 className="w-full flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-red-600 border-2 border-red-200 py-3 hover:bg-red-50 transition-all neo-interactive"
               >
                 <LogOut className="w-4 h-4" />
-                Выход из системы
+                Сменить сессию
               </button>
             </div>
           </motion.aside>
@@ -226,12 +167,25 @@ export default function App() {
             <div className="md:hidden p-1.5 bg-brand text-white mr-1 border-2 border-brand">
                <Construction className="w-6 h-6" />
             </div>
-            <h2 className="text-xl md:text-2xl font-black uppercase italic tracking-tighter truncate leading-none">
-              {menuItems.find(m => m.id === activeSection)?.label}
-            </h2>
+            <div className="flex flex-col">
+              <h2 className="text-sm md:text-xl font-black uppercase italic tracking-tighter truncate leading-none">
+                {menuItems.find(m => m.id === activeSection)?.label}
+              </h2>
+              <div className="text-[8px] font-black opacity-30 tracking-[0.2em] italic uppercase mt-1 hidden md:block">Shared Workspace</div>
+            </div>
           </div>
 
           <div className="flex items-center gap-3 md:gap-6">
+            <button 
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                alert('Ссылка на общую сессию скопирована!');
+              }}
+              className="hidden sm:flex bg-brand text-white px-4 py-2.5 text-[10px] font-black uppercase tracking-widest italic neo-shadow-sm items-center gap-2"
+            >
+              <Share2 className="w-4 h-4" />
+              <span>Пригласить</span>
+            </button>
             <div className="relative group hidden xl:block">
               <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand" />
               <input 
@@ -246,7 +200,9 @@ export default function App() {
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-600 border-2 border-brand"></span>
             </button>
             <div className="md:hidden flex items-center">
-               <img src={user.photoURL || ''} alt="" className="w-10 h-10 border-2 border-brand shadow-sm" />
+               <div className="w-10 h-10 border-2 border-brand shadow-sm bg-brand text-white flex items-center justify-center font-black">
+                 {userName[0]}
+               </div>
             </div>
           </div>
         </header>
@@ -264,11 +220,10 @@ export default function App() {
               {activeSection === 'dashboard' && <Dashboard onNavigate={setActiveSection} />}
               {activeSection === 'contacts' && <Contacts />}
               {activeSection === 'projects' && <Projects />}
-              {activeSection === 'tasks' && <Tasks />}
-              {activeSection === 'communication' && <CommunicationLogs />}
+              {activeSection === 'tasks' && <Tasks userName={userName} />}
+              {activeSection === 'communication' && <CommunicationLogs userName={userName} />}
               {activeSection === 'financials' && <Financials />}
               {activeSection === 'travel' && <TravelLogs />}
-              {activeSection === 'registrations' && <Registrations />}
             </motion.div>
           </AnimatePresence>
           <ReminderOverlay />

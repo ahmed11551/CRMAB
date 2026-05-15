@@ -4,7 +4,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase.ts';
 import { MessageSquare, Phone, Send, Mail, Map, Sparkles, User, Construction, Search, Filter, X, Trash2, Clock, Plus } from 'lucide-react';
 import { Communication, Contact } from '../types.ts';
 
-export default function CommunicationLogs() {
+export default function CommunicationLogs({ userName }: { userName?: string }) {
   const [logs, setLogs] = useState<Communication[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isAdding, setIsAdding] = useState(false);
@@ -60,7 +60,7 @@ export default function CommunicationLogs() {
     try {
       await addDoc(collection(db, path), {
         ...newLog,
-        sender: 'Self',
+        sender: userName || 'Self',
         timestamp: serverTimestamp()
       });
       setIsAdding(false);

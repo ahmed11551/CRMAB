@@ -54,19 +54,9 @@ async function startServer() {
   // AI Initialization
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const genAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
-  const telegramToken = process.env.TELEGRAM_BOT_TOKEN || "8725593924:AAFbIhgcc04zvpQKH1inaK2c4ndgSrUPKso";
 
   // Health Check
   app.get("/api/health", async (req, res) => {
-    let telegramStatus = "Unknown";
-    try {
-      const response = await fetch(`https://api.telegram.org/bot${telegramToken}/getMe`);
-      const data = await response.json();
-      telegramStatus = data.ok ? `Verified (${data.result.username})` : `Error: ${data.description}`;
-    } catch (e) {
-      telegramStatus = "Connection Failed";
-    }
-
     res.json({
       status: "ok",
       firebase: {
@@ -76,10 +66,6 @@ async function startServer() {
       },
       ai: {
         configured: !!genAI
-      },
-      telegram: {
-        tokenConfigured: !!telegramToken,
-        tokenStatus: telegramStatus
       }
     });
   });
@@ -95,202 +81,6 @@ async function startServer() {
     } catch (error) {
       console.error("AI Summary Error:", error);
       res.status(500).json({ error: "Failed to generate summary" });
-    }
-  });
-
-  // Telegram Bot Webhook
-  app.post("/api/telegram/webhook", async (req, res) => {
-    const token = telegramToken;
-    console.log("Webhook received body:", JSON.stringify(req.body));
-
-    if (!token) {
-      console.error("TELEGRAM_BOT_TOKEN not configured");
-      return res.status(500).send("TELEGRAM_BOT_TOKEN not configured");
-    }
-
-    const { message } = req.body;
-    if (!message) {
-      return res.status(200).send("OK");
-    }
-
-    const chat_id = message.chat.id;
-    const text = message.text;
-
-    // Handle Commands
-    if (text === "/start" || text === "/register") {
-      console.log("Handling /start command for chat_id:", chat_id);
-      try {
-        const teleRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id,
-            text: "👋 Привет! Я ваш ассистент BuildSync.\n\nДля регистрации и привязки вашего аккаунта, пожалуйста, поделитесь вашим номером телефона, нажав на кнопку ниже.",
-            reply_markup: {
-              keyboard: [[{ text: "📲 Поделиться контактом", request_contact: true }]],
-              one_time_keyboard: true,
-              resize_keyboard: true
-            }
-          })
-        });
-        const teleData = await teleRes.json();
-        console.log("Telegram response for /start:", teleData);
-      } catch (err) {
-        console.error("Error sending start message:", err);
-      }
-      return res.status(200).send("OK");
-    }
-
-    // Handle Shared Contacts
-    if (message.contact && adminDb) {
-      console.log("Handling shared contact for chat_id:", chat_id);
-      const contact = message.contact;
-      try {
-        await adminDb.collection("registrations").add({
-          telegramId: String(contact.user_id || chat_id),
-          phoneNumber: contact.phone_number,
-          firstName: contact.first_name || "",
-          lastName: contact.last_name || "",
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-
-        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id,
-            text: `✅ Спасибо! Ваш номер ${contact.phone_number} зарегистрирован в системе.\n\nТеперь вы можете отправлять мне задачи, контакты и отчеты об объектах.`,
-            reply_markup: { remove_keyboard: true }
-          })
-        });
-      } catch (err) {
-        console.error("Error saving registration or sending confirmation:", err);
-      }
-      return res.status(200).send("OK");
-    }
-
-    if (!text || !genAI || !adminDb) return res.status(200).send("OK");
-
-    try {
-      console.log("Processing message with AI:", text);
-      const prompt = `
-        You are a smart construction manager assistant. Extract data from the following message: "${text}".
-        Decide if it's a TASK, CONTACT, PROJECT, or COMMUNICATION log.
-        
-        Output valid JSON in one of these formats:
-        
-        If TASK: { "type": "TASK", "data": { "title": "...", "description": "...", "priority": "Low|Medium|High|Urgent" } }
-        If CONTACT: { "type": "CONTACT", "data": { "name": "...", "role": "Contractor|Client|Vendor|Team", "phone": "...", "notes": "..." } }
-        If PROJECT: { "type": "PROJECT", "data": { "name": "...", "address": "...", "status": "Planning|In Progress" } }
-        If COMMUNICATION: { "type": "COMM", "data": { "content": "...", "commType": "Call|WhatsApp|Telegram|Visit" } }
-        
-        If unsure, output: { "type": "UNKNOWN", "message": "Short explanation why" }
-        Always output ONLY valid JSON.
-      `;
-
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
-      console.log("AI Response:", responseText);
-      
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-
-      if (parsed && parsed.type !== "UNKNOWN") {
-        let collectionName = "";
-        let finalData: any = {};
-        let replyText = "";
-
-        switch (parsed.type) {
-          case "TASK":
-            collectionName = "tasks";
-            finalData = { ...parsed.data, status: "Pending" };
-            replyText = `✅ Задача создана: ${parsed.data.title}`;
-            break;
-          case "CONTACT":
-            collectionName = "contacts";
-            finalData = { ...parsed.data };
-            replyText = `👤 Контакт добавлен: ${parsed.data.name} (${parsed.data.role})`;
-            break;
-          case "PROJECT":
-            collectionName = "projects";
-            finalData = { ...parsed.data };
-            replyText = `🏗️ Объект зарегистрирован: ${parsed.data.name}`;
-            break;
-          case "COMM":
-            collectionName = "communications";
-            finalData = { 
-              content: parsed.data.content, 
-              type: parsed.data.commType || "Telegram", 
-              sender: "System/Telegram",
-              timestamp: new Date().toISOString(),
-              contactId: parsed.data.contactId || "unknown"
-            };
-            replyText = `💬 Запись в журнал добавлена.`;
-            break;
-        }
-
-        if (collectionName) {
-          await adminDb.collection(collectionName).add({
-             ...finalData,
-             createdAt: admin.firestore.FieldValue.serverTimestamp(),
-             timestamp: finalData.timestamp ? admin.firestore.Timestamp.fromDate(new Date(finalData.timestamp)) : undefined
-          });
-          console.log(`Saved ${parsed.type} via Admin SDK`);
-          
-          await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id, text: replyText })
-          });
-        }
-      } else {
-        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id,
-            text: `❓ Я не смог распознать команду. Попробуйте написать:\n- "Добавь задачу: проверить фундамент"\n- "Запиши контакт: Иван, прораб, +7999..."\n- "Новый объект: ЖК Радужный, ул. Мира 5"`
-          })
-        });
-      }
-
-      res.status(200).send("OK");
-    } catch (error) {
-      console.error("Telegram Webhook Error:", error);
-      res.status(200).send("OK");
-    }
-  });
-
-  // Helper route to set the webhook
-  app.get("/api/telegram/setup", async (req, res) => {
-    const token = telegramToken;
-    
-    let appUrl = process.env.APP_URL;
-    if (!appUrl || appUrl === "MY_APP_URL" || appUrl.includes('localhost')) {
-      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-      const host = req.headers['host'];
-      appUrl = `${protocol}://${host}`;
-    }
-    
-    if (appUrl.endsWith('/')) appUrl = appUrl.slice(0, -1);
-
-    const webhookUrl = `${appUrl}/api/telegram/webhook`;
-    console.log("Attempting to set Telegram webhook to:", webhookUrl);
-
-    try {
-      const response = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${webhookUrl}`);
-      const data = await response.json();
-      console.log("Telegram setWebhook response:", data);
-      res.json({ 
-        message: "Webhook setup attempt complete", 
-        telegram_response: data, 
-        webhook_url: webhookUrl,
-        detected_app_url: appUrl
-      });
-    } catch (error) {
-      console.error("Setup Webhook Error:", error);
-      res.status(500).json({ error: "Failed to set webhook", details: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -313,8 +103,6 @@ async function startServer() {
     console.log("Firebase Client DB Initialized:", !!db);
     console.log("Firebase Admin DB Initialized:", !!adminDb);
     console.log("Gemini AI Initialized:", !!genAI);
-    console.log("Telegram Token Configured:", !!telegramToken);
-    console.log("Telegram Token Start:", telegramToken.substring(0, 10) + "...");
   });
 }
 
