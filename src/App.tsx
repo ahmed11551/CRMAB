@@ -51,9 +51,19 @@ export default function App() {
 
   const handleLogin = async () => {
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
-    } catch (err) {
+      const result = await signInWithPopup(auth, new GoogleAuthProvider());
+      if (result.user) {
+        console.log("Logged in:", result.user.email);
+      }
+    } catch (err: any) {
       console.error("Login failed:", err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        alert("Окно авторизации было закрыто. Пожалуйста, попробуйте снова и завершите вход.");
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        // Ignore duplicate popup requests
+      } else {
+        alert("Ошибка входа: " + err.message + "\nПопробуйте открыть приложение в новом окне.");
+      }
     }
   };
 
@@ -93,6 +103,10 @@ export default function App() {
                <li className="flex gap-2"><span>1.</span> <span>Авторизация через Google API</span></li>
                <li className="flex gap-2"><span>2.</span> <span>Автоматическое создание профиля</span></li>
                <li className="flex gap-2"><span>3.</span> <span>Доступ к объектам и журналам 24/7</span></li>
+               <li className="flex gap-2 pt-3 border-t border-brand/10">
+                 <MessageSquare className="w-4 h-4 text-brand" />
+                 <span>Или отправьте /start боту для регистрации</span>
+               </li>
              </ul>
           </div>
 

@@ -70,5 +70,15 @@ service cloud.firestore {
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
+    
+    match /registrations/{regId} {
+      allow read: if isSignedIn();
+      allow create: if true; // Allowed from server-side as well, but this is client SDK
+    }
+    
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
+    }
   }
 }

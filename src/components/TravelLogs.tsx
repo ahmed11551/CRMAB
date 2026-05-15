@@ -1,14 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import React, { useState, useEffect, useMemo } from 'react';
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase.ts';
-import { MapPin, Plus, Plane, Navigation, Construction, Calendar } from 'lucide-react';
+import { MapPin, Plus, Plane, Navigation, Construction, Calendar, Search, Filter, X, Globe, Footprints, Trash2 } from 'lucide-react';
 import { TravelLog, Project } from '../types.ts';
 
 export default function TravelLogs() {
   const [logs, setLogs] = useState<TravelLog[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isAdding, setIsAdding] = useState(false);
-  const [newLog, setNewLog] = useState({ destination: '', purpose: '', date: new Date().toISOString().split('T')[0], cost: 0, projectId: '' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [projectFilter, setProjectFilter] = useState<string | null>(null);
+  
+  const [newLog, setNewLog] = useState({ 
+    destination: '', 
+    purpose: '', 
+    date: new Date().toISOString().split('T')[0], 
+    cost: 0, 
+    projectId: '' 
+  });
 
   useEffect(() => {
     const q = query(collection(db, 'travelLogs'), orderBy('date', 'desc'));
@@ -17,12 +26,40 @@ export default function TravelLogs() {
     return () => unsubLogs();
   }, []);
 
+  const filteredLogs = useMemo(() => {
+    let result = logs;
+
+    if (projectFilter) {
+      result = result.filter(log => log.projectId === projectFilter);
+    }
+
+    const search = searchQuery.toLowerCase().trim();
+    if (search) {
+      result = result.filter(log => 
+        log.destination.toLowerCase().includes(search) ||
+        log.purpose.toLowerCase().includes(search) ||
+        (projects.find(p => p.id === log.projectId)?.name || '').toLowerCase().includes(search)
+      );
+    }
+
+    return result;
+  }, [logs, projectFilter, searchQuery, projects]);
+
+  const stats = useMemo(() => {
+    return {
+      totalCost: logs.reduce((acc, log) => acc + (log.cost || 0), 0),
+      totalTrips: logs.length,
+      uniqueDestinations: new Set(logs.map(log => log.destination)).size
+    };
+  }, [logs]);
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const path = 'travelLogs';
     try {
       await addDoc(collection(db, path), { 
         ...newLog, 
+        cost: Number(newLog.cost),
         userId: auth.currentUser?.uid,
         createdAt: serverTimestamp() 
       });
@@ -33,12 +70,21 @@ export default function TravelLogs() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Удалить эту запись из реестра?')) return;
+    try {
+      await deleteDoc(doc(db, 'travelLogs', id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `travelLogs/${id}`);
+    }
+  };
+
   return (
     <div className="space-y-10 md:space-y-16 pb-24 md:pb-20 px-1 md:px-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b-4 border-brand pb-6">
         <div>
           <h1 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter mb-2 leading-none">РЕЕСТР ПЕРЕМЕЩЕНИЙ</h1>
-          <p className="text-gray-500 uppercase tracking-[0.4em] text-[10px] md:text-xs font-black italic">Логи мобильности развертывания</p>
+          <p className="text-gray-500 uppercase tracking-[0.4em] text-[10px] md:text-xs font-black italic">Логи мобильности стратегических выездов</p>
         </div>
         <button 
           onClick={() => setIsAdding(true)}
@@ -49,10 +95,63 @@ export default function TravelLogs() {
         </button>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10">
+         <div className="bg-white border-4 border-brand p-8 neo-shadow relative group overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-brand/5 rotate-45 translate-x-12 -translate-y-12"></div>
+            <div className="flex justify-between items-center mb-6">
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 italic">ЛОГИСТИЧЕСКИЕ ЗАТРАТЫ</div>
+              <Globe className="w-6 h-6 text-brand" />
+            </div>
+            <div className="text-4xl md:text-5xl font-black italic font-mono tracking-tighter">{stats.totalCost.toLocaleString()} ₽</div>
+         </div>
+         <div className="bg-white border-4 border-brand p-8 neo-shadow relative group overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-brand/5 rotate-45 translate-x-12 -translate-y-12"></div>
+            <div className="flex justify-between items-center mb-6">
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 italic">ОПЕРАТИВНЫЕ ВЫЕЗДЫ</div>
+              <Navigation className="w-6 h-6 text-brand" />
+            </div>
+            <div className="text-4xl md:text-5xl font-black italic font-mono tracking-tighter uppercase">{stats.totalTrips} МИССИЙ</div>
+         </div>
+         <div className="bg-white border-4 border-brand p-8 neo-shadow relative group overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-brand/5 rotate-45 translate-x-12 -translate-y-12"></div>
+            <div className="flex justify-between items-center mb-6">
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 italic">ГЕОГРАФИЯ ОХВАТА</div>
+              <MapPin className="w-6 h-6 text-brand" />
+            </div>
+            <div className="text-4xl md:text-5xl font-black italic font-mono tracking-tighter uppercase">{stats.uniqueDestinations} ТОЧЕК</div>
+         </div>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-6">
+        <div className="relative flex-1 group">
+          <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand" />
+          <input 
+            type="text" 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Поиск по маршрутам и целям..." 
+            className="w-full bg-white border-2 border-brand pl-12 pr-6 py-4 text-sm focus:outline-none italic font-bold uppercase tracking-wider neo-shadow-sm focus:shadow-none transition-all" 
+          />
+        </div>
+        <select 
+          value={projectFilter || ''}
+          onChange={(e) => setProjectFilter(e.target.value || null)}
+          className="px-6 py-4 border-2 border-brand text-[10px] font-black uppercase tracking-widest italic transition-all neo-shadow-sm hover:shadow-none bg-white appearance-none cursor-pointer pr-12 min-w-[200px]"
+        >
+          <option value="">ВСЕ ОБЪЕКТЫ</option>
+          {projects.map(p => (
+            <option key={p.id} value={p.id}>{p.name.toUpperCase()}</option>
+          ))}
+        </select>
+      </div>
+
       {isAdding && (
-         <div className="bg-white border-4 border-brand p-8 md:p-12 neo-shadow max-w-2xl relative">
-           <div className="absolute -top-4 -right-4 w-12 h-12 bg-brand text-white flex items-center justify-center -rotate-12 border-2 border-brand">
-             <MapPin className="w-6 h-6" />
+         <div className="bg-white border-4 border-brand p-8 md:p-12 neo-shadow max-w-2xl relative animate-in fade-in slide-in-from-top-4 duration-300">
+           <button onClick={() => setIsAdding(false)} className="absolute top-4 right-4 p-2 hover:bg-gray-100 transition-colors">
+              <X className="w-6 h-6" />
+           </button>
+           <div className="absolute -top-4 -left-4 w-12 h-12 bg-brand text-white flex items-center justify-center -rotate-12 border-2 border-brand neo-shadow-sm">
+             <Footprints className="w-6 h-6" />
            </div>
            <h3 className="text-2xl md:text-3xl font-black uppercase italic mb-10 border-b-4 border-brand pb-4">НОВАЯ ЗАПИСЬ О ПЕРЕМЕЩЕНИИ</h3>
            <form onSubmit={handleAdd} className="space-y-8">
@@ -91,38 +190,50 @@ export default function TravelLogs() {
          </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10">
-         {logs.map((log) => (
-           <div key={log.id} className="bg-white border-2 border-brand p-8 neo-shadow hover:translate-y-[-8px] hover:shadow-brand transition-all group overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-brand/5 rotate-45 translate-x-12 -translate-y-12"></div>
-              <div className="flex justify-between items-start mb-8 relative z-10">
-                 <div className="w-14 h-14 bg-bg border-2 border-brand flex items-center justify-center neo-shadow-sm group-hover:bg-brand group-hover:text-white transition-all transform rotate-6">
-                    <Plane className="w-7 h-7" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12">
+         {filteredLogs.map((log) => (
+           <div key={log.id} className="bg-white border-4 border-brand p-10 neo-shadow hover:translate-y-[-10px] hover:shadow-brand-strong transition-all group overflow-hidden relative animate-in fade-in zoom-in-95 duration-500 font-black">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-brand/5 rotate-45 translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-700"></div>
+              <div className="flex justify-between items-start mb-10 relative z-10">
+                 <div className="w-16 h-16 bg-bg border-4 border-brand flex items-center justify-center neo-shadow-sm group-hover:bg-brand group-hover:text-white group-hover:rotate-0 transition-all transform rotate-12 duration-500">
+                    <Plane className="w-8 h-8" />
                  </div>
-                 <div className="bg-brand text-white px-3 py-1 border-2 border-brand text-[10px] font-black uppercase tracking-widest font-mono italic shadow-sm transform -rotate-12">{log.date}</div>
+                 <div className="bg-brand text-white px-4 py-2 border-4 border-brand text-[11px] font-black uppercase tracking-widest font-mono italic shadow-sm transform -rotate-6 group-hover:rotate-0 transition-transform">{log.date}</div>
               </div>
-              <h3 className="text-2xl font-black uppercase italic tracking-tighter mb-3 leading-none group-hover:text-brand transition-colors">{log.destination}</h3>
-              <p className="text-sm italic text-gray-500 mb-8 border-l-4 border-brand/20 pl-4 py-1 leading-relaxed font-medium">{log.purpose}</p>
               
-              <div className="flex items-center justify-between pt-6 border-t-2 border-brand/10 relative z-10">
-                <div className="flex items-center gap-3 text-[10px] uppercase font-black text-gray-400 italic bg-bg px-2 py-1 border border-brand/5">
+              <div className="flex flex-col gap-2 mb-8">
+                <h3 className="text-3xl md:text-4xl font-black uppercase italic tracking-tighter leading-none group-hover:text-brand transition-colors truncate">{log.destination}</h3>
+                <div className="text-[10px] text-gray-400 uppercase tracking-widest font-black italic flex items-center gap-2">
                    <Construction className="w-4 h-4 text-brand" />
-                   {projects.find(p => p.id === log.projectId)?.name || 'ОБЩИЕ'}
+                   {projects.find(p => p.id === log.projectId)?.name || 'ОПЕРАЦИОННЫЙ ОВЕРХЕД'}
                 </div>
-                <div className="text-lg font-black font-mono italic text-brand">{log.cost || 0} ₽</div>
+              </div>
+
+              <div className="relative mb-10 group-hover:translate-x-1 transition-transform duration-500">
+                <div className="absolute left-0 top-0 bottom-0 w-2 bg-brand/10"></div>
+                <p className="text-sm md:text-base italic text-gray-500 py-1 pl-6 leading-relaxed font-black uppercase tracking-tight">{log.purpose}</p>
+              </div>
+              
+              <div className="flex items-center justify-between pt-8 border-t-4 border-brand/10 relative z-10">
+                <div className="text-2xl font-black font-mono italic text-brand tracking-tighter group-hover:scale-110 transition-transform duration-500">{log.cost || 0} ₽</div>
+                <button 
+                  onClick={() => handleDelete(log.id)}
+                  className="p-3 border-2 border-transparent hover:border-red-600 hover:text-red-600 text-gray-200 transition-all hover:bg-red-50"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
               </div>
            </div>
          ))}
-         {logs.length === 0 && (
-           <div className="col-span-full p-24 text-center border-4 border-dashed border-brand/20 bg-white/50 neo-shadow flex flex-col items-center justify-center space-y-6">
-             <div className="w-20 h-20 bg-bg border-2 border-brand mx-auto flex items-center justify-center">
-              <Navigation className="w-10 h-10 text-gray-200" />
-            </div>
-             <div className="text-sm uppercase tracking-[0.4em] font-black text-gray-300 italic text-center">ЗАПИСИ О ПЕРЕМЕЩЕНИЯХ В РЕЕСТРЕ ОТСУТСТВУЮТ</div>
+         {filteredLogs.length === 0 && (
+           <div className="col-span-full p-32 text-center border-8 border-dashed border-brand/10 bg-white/50 neo-shadow flex flex-col items-center justify-center space-y-8">
+              <div className="w-24 h-24 bg-bg border-4 border-brand mx-auto flex items-center justify-center rotate-12 group-hover:rotate-0 transition-transform duration-500">
+               <Navigation className="w-12 h-12 text-gray-200" />
+             </div>
+              <div className="text-xl uppercase tracking-[0.5em] font-black text-gray-300 italic text-center">РЕЕСТР ПУСТ // ПЕРЕМЕЩЕНИЙ НЕ ЗАФИКСИРОВАНЫ</div>
            </div>
          )}
       </div>
     </div>
-
   );
 }

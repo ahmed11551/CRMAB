@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase.ts';
-import { DollarSign, Plus, ArrowUpRight, ArrowDownLeft, Wallet, Construction, User, Trash2 } from 'lucide-react';
+import { DollarSign, Plus, ArrowUpRight, ArrowDownLeft, Wallet, Construction, User, Trash2, Search, Filter, X, TrendingUp, Calculator } from 'lucide-react';
 import { Financial, Project, Contact } from '../types.ts';
 
 export default function Financials() {
@@ -9,7 +9,19 @@ export default function Financials() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isAdding, setIsAdding] = useState(false);
-  const [newTx, setNewTx] = useState({ amount: 0, type: 'Expense', description: '', status: 'Paid', projectId: '', contactId: '', date: new Date().toISOString().split('T')[0] });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [projectFilter, setProjectFilter] = useState<string | null>(null);
+
+  const [newTx, setNewTx] = useState({ 
+    amount: 0, 
+    type: 'Expense' as const, 
+    description: '', 
+    status: 'Paid', 
+    projectId: '', 
+    contactId: '', 
+    date: new Date().toISOString().split('T')[0] 
+  });
 
   useEffect(() => {
     const q = query(collection(db, 'financials'), orderBy('date', 'desc'));
@@ -19,11 +31,34 @@ export default function Financials() {
     return () => unsubTxs();
   }, []);
 
+  const filteredTxs = useMemo(() => {
+    let result = txs;
+
+    if (typeFilter) {
+      result = result.filter(tx => tx.type === typeFilter);
+    }
+
+    if (projectFilter) {
+      result = result.filter(tx => tx.projectId === projectFilter);
+    }
+
+    const search = searchQuery.toLowerCase().trim();
+    if (search) {
+      result = result.filter(tx => 
+        tx.description.toLowerCase().includes(search) ||
+        (projects.find(p => p.id === tx.projectId)?.name || '').toLowerCase().includes(search) ||
+        (contacts.find(c => c.id === tx.contactId)?.name || '').toLowerCase().includes(search)
+      );
+    }
+
+    return result;
+  }, [txs, typeFilter, projectFilter, searchQuery, projects, contacts]);
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const path = 'financials';
     try {
-      await addDoc(collection(db, path), { ...newTx, createdAt: serverTimestamp() });
+      await addDoc(collection(db, path), { ...newTx, amount: Number(newTx.amount), createdAt: serverTimestamp() });
       setIsAdding(false);
       setNewTx({ amount: 0, type: 'Expense', description: '', status: 'Paid', projectId: '', contactId: '', date: new Date().toISOString().split('T')[0] });
     } catch (err) {
@@ -40,12 +75,14 @@ export default function Financials() {
     }
   };
 
-  const totals = txs.reduce((acc, tx) => {
-    if (tx.type === 'Income') acc.income += tx.amount;
-    else if (tx.type === 'Expense') acc.expenses += tx.amount;
-    else if (tx.type === 'Debt') acc.debt += tx.amount;
-    return acc;
-  }, { income: 0, expenses: 0, debt: 0 });
+  const totals = useMemo(() => {
+    return txs.reduce((acc, tx) => {
+      if (tx.type === 'Income') acc.income += tx.amount;
+      else if (tx.type === 'Expense') acc.expenses += tx.amount;
+      else if (tx.type === 'Debt') acc.debt += tx.amount;
+      return acc;
+    }, { income: 0, expenses: 0, debt: 0 });
+  }, [txs]);
 
   const typeMap: Record<string, string> = {
     'Income': 'Доход',
@@ -71,35 +108,75 @@ export default function Financials() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10">
         <div className="bg-white border-4 border-brand p-8 neo-shadow relative overflow-hidden group">
-           <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rotate-45 translate-x-12 -translate-y-12"></div>
+           <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rotate-45 translate-x-12 -translate-y-12 transition-all group-hover:scale-150"></div>
            <div className="flex justify-between items-center mb-6 relative z-10">
               <div className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-gray-400 italic">Входящий капитал</div>
               <ArrowUpRight className="w-6 h-6 text-green-500 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
            </div>
-           <div className="text-4xl md:text-5xl font-black italic font-mono tracking-tighter relative z-10 leading-none">{totals.income.toLocaleString()} ₽</div>
+           <div className="text-4xl md:text-5xl font-black italic font-mono tracking-tighter relative z-10 leading-none group-hover:text-green-600 transition-colors uppercase">{totals.income.toLocaleString()} ₽</div>
         </div>
         <div className="bg-white border-4 border-brand p-8 neo-shadow relative overflow-hidden group">
-           <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rotate-45 translate-x-12 -translate-y-12"></div>
+           <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rotate-45 translate-x-12 -translate-y-12 transition-all group-hover:scale-150"></div>
            <div className="flex justify-between items-center mb-6 relative z-10">
               <div className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-gray-400 italic">Исходящий поток</div>
               <ArrowDownLeft className="w-6 h-6 text-red-500 group-hover:-translate-x-1 group-hover:translate-y-1 transition-transform" />
            </div>
-           <div className="text-4xl md:text-5xl font-black italic font-mono tracking-tighter relative z-10 leading-none">{totals.expenses.toLocaleString()} ₽</div>
+           <div className="text-4xl md:text-5xl font-black italic font-mono tracking-tighter relative z-10 leading-none group-hover:text-red-600 transition-colors uppercase">{totals.expenses.toLocaleString()} ₽</div>
         </div>
         <div className="bg-bg border-4 border-brand p-8 neo-shadow relative overflow-hidden group">
-           <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rotate-45 translate-x-12 -translate-y-12"></div>
+           <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rotate-45 translate-x-12 -translate-y-12 transition-all group-hover:scale-150"></div>
            <div className="flex justify-between items-center mb-6 relative z-10">
               <div className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-gray-400 italic">Обязательства (Долг)</div>
               <Wallet className="w-6 h-6 text-orange-500 group-hover:scale-110 transition-transform" />
            </div>
-           <div className="text-4xl md:text-5xl font-black italic font-mono tracking-tighter text-orange-600 relative z-10 leading-none">{totals.debt.toLocaleString()} ₽</div>
+           <div className="text-4xl md:text-5xl font-black italic font-mono tracking-tighter text-orange-600 relative z-10 leading-none uppercase group-hover:text-orange-700 transition-colors">{totals.debt.toLocaleString()} ₽</div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-8">
+        <div className="flex flex-col md:flex-row gap-6">
+          <div className="relative flex-1 group">
+            <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand" />
+            <input 
+              type="text" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Поиск по транзакциям..." 
+              className="w-full bg-white border-2 border-brand pl-12 pr-6 py-4 text-sm focus:outline-none italic font-bold uppercase tracking-wider neo-shadow-sm focus:shadow-none transition-all" 
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <select 
+              value={typeFilter || ''}
+              onChange={(e) => setTypeFilter(e.target.value || null)}
+              className="px-6 py-4 border-2 border-brand text-[10px] font-black uppercase tracking-widest italic transition-all neo-shadow-sm hover:shadow-none bg-white appearance-none cursor-pointer pr-12 min-w-[160px]"
+            >
+              <option value="">ВСЕ ТИПЫ</option>
+              {Object.entries(typeMap).map(([key, label]) => (
+                <option key={key} value={key}>{label.toUpperCase()}</option>
+              ))}
+            </select>
+            <select 
+              value={projectFilter || ''}
+              onChange={(e) => setProjectFilter(e.target.value || null)}
+              className="px-6 py-4 border-2 border-brand text-[10px] font-black uppercase tracking-widest italic transition-all neo-shadow-sm hover:shadow-none bg-white appearance-none cursor-pointer pr-12 min-w-[160px]"
+            >
+              <option value="">ВСЕ ОБЪЕКТЫ</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>{p.name.toUpperCase()}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       {isAdding && (
-         <div className="bg-white border-4 border-brand p-8 md:p-12 neo-shadow max-w-2xl relative">
-           <div className="absolute -top-4 -right-4 w-12 h-12 bg-brand text-white flex items-center justify-center -rotate-12 border-2 border-brand">
-             <DollarSign className="w-6 h-6" />
+         <div className="bg-white border-4 border-brand p-8 md:p-12 neo-shadow max-w-2xl relative animate-in fade-in slide-in-from-top-4 duration-300">
+           <button onClick={() => setIsAdding(false)} className="absolute top-4 right-4 p-2 hover:bg-gray-100 transition-colors">
+              <X className="w-6 h-6" />
+           </button>
+           <div className="absolute -top-4 -left-4 w-12 h-12 bg-brand text-white flex items-center justify-center -rotate-12 border-2 border-brand neo-shadow-sm">
+             <Calculator className="w-6 h-6" />
            </div>
            <h3 className="text-2xl md:text-3xl font-black uppercase italic mb-10 border-b-4 border-brand pb-4">ЗАПИСЬ В ФИНАНСОВУЮ КНИГУ</h3>
            <form onSubmit={handleAdd} className="space-y-8">
@@ -145,45 +222,48 @@ export default function Financials() {
          </div>
       )}
 
-      <div className="bg-white border-4 border-brand neo-shadow overflow-hidden group">
+      <div className="bg-white border-4 border-brand neo-shadow overflow-hidden group animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-bg border-b-4 border-brand">
                 <th className="p-6 text-[11px] md:text-[13px] uppercase tracking-widest font-black italic text-brand/40">Дата</th>
                 <th className="p-6 text-[11px] md:text-[13px] uppercase tracking-widest font-black italic text-brand/40">Описание / Контекст</th>
-                <th className="p-6 text-[11px] md:text-[13px] uppercase tracking-widest font-black italic text-brand/40">Тип</th>
+                <th className="p-6 text-[11px] md:text-[13px] uppercase tracking-widest font-black italic text-brand/40 text-center">Тип</th>
                 <th className="p-6 text-[11px] md:text-[13px] uppercase tracking-widest font-black italic text-brand/40 text-right">Сумма</th>
                 <th className="p-6 text-[11px] md:text-[13px] uppercase tracking-widest font-black italic text-brand/40 text-right w-10"></th>
               </tr>
             </thead>
-            <tbody className="divide-y-2 divide-brand/5">
-              {txs.map(tx => (
-                <tr key={tx.id} className="hover:bg-bg transition-all group/row">
-                  <td className="p-6 font-mono text-[10px] md:text-xs font-bold text-gray-500 italic">{tx.date}</td>
+            <tbody className="divide-y-4 divide-brand/5">
+              {filteredTxs.map(tx => (
+                <tr key={tx.id} className="hover:bg-bg/50 transition-all group/row">
+                  <td className="p-6 font-mono text-[10px] md:text-xs font-black text-gray-400 italic">{tx.date}</td>
                   <td className="p-6">
-                     <div className="text-sm md:text-base font-black uppercase tracking-tighter text-brand italic group-hover/row:translate-x-1 transition-transform">{tx.description}</div>
-                     <div className="flex flex-wrap gap-4 text-[9px] md:text-[10px] uppercase tracking-widest font-black italic text-gray-400 mt-2">
-                        <span className="flex items-center gap-2 bg-gray-50 px-2 py-0.5 border border-brand/5"><Construction className="w-3.5 h-3.5 text-brand" /> {projects.find(p => p.id === tx.projectId)?.name || 'Н/Д'}</span>
-                        <span className="flex items-center gap-2 bg-gray-50 px-2 py-0.5 border border-brand/5"><User className="w-3.5 h-3.5 text-brand" /> {contacts.find(c => c.id === tx.contactId)?.name || 'Н/Д'}</span>
+                     <div className="text-base md:text-xl font-black uppercase tracking-tighter text-brand italic group-hover/row:translate-x-2 transition-transform duration-300">{tx.description}</div>
+                     <div className="flex flex-wrap gap-4 text-[9px] md:text-[10px] uppercase tracking-[0.3em] font-black italic text-gray-400 mt-2">
+                        <span className="flex items-center gap-2 bg-white px-2 py-1 border border-brand/10 shadow-sm"><Construction className="w-3.5 h-3.5 text-brand" /> {projects.find(p => p.id === tx.projectId)?.name || 'ОВЕРХЕД'}</span>
+                        <span className="flex items-center gap-2 bg-white px-2 py-1 border border-brand/10 shadow-sm"><User className="w-3.5 h-3.5 text-brand" /> {contacts.find(c => c.id === tx.contactId)?.name || 'БЕЗЛИЧНО'}</span>
                      </div>
                   </td>
-                  <td className="p-6">
-                     <span className={`text-[9px] md:text-[11px] font-black uppercase px-3 py-1 border-2 border-brand shadow-sm inline-block transform -rotate-2 ${
-                       tx.type === 'Income' ? 'bg-green-500 text-white' : 
-                       tx.type === 'Debt' ? 'bg-orange-500 text-white' : 'bg-red-600 text-white'
+                  <td className="p-6 text-center">
+                     <span className={`text-[9px] md:text-[11px] font-black uppercase px-4 py-1.5 border-4 border-brand shadow-sm inline-block transform group-hover/row:rotate-0 transition-transform ${
+                       tx.type === 'Income' ? 'bg-green-500 text-white -rotate-2' : 
+                       tx.type === 'Debt' ? 'bg-orange-500 text-white rotate-2' : 'bg-red-600 text-white -rotate-2'
                      }`}>
                        {typeMap[tx.type] || tx.type}
                      </span>
                   </td>
-                  <td className={`p-6 text-right font-black font-mono text-base md:text-xl transform transition-transform group-hover/row:scale-110 ${
+                  <td className={`p-6 text-right font-black font-mono text-lg md:text-2xl transform transition-all duration-300 group-hover/row:scale-110 ${
                     tx.type === 'Income' ? 'text-green-600' : tx.type === 'Expense' ? 'text-red-600' : 'text-orange-600'
                   }`}>
-                    {tx.type === 'Expense' ? '—' : '+'} {tx.amount.toLocaleString()} ₽
+                    <div className="flex items-center justify-end gap-2">
+                      {tx.type === 'Income' ? <TrendingUp className="w-5 h-5 md:w-6 md:h-6" /> : null}
+                      <span className="uppercase">{tx.type === 'Expense' ? '—' : '+'} {tx.amount.toLocaleString()} ₽</span>
+                    </div>
                   </td>
                   <td className="p-6 text-right">
-                     <button onClick={() => handleDelete(tx.id)} className="p-2 text-gray-300 hover:text-red-600 transition-colors">
-                       <Trash2 className="w-4 h-4" />
+                     <button onClick={() => handleDelete(tx.id)} className="p-3 text-gray-200 hover:text-red-600 hover:bg-red-50 transition-all rounded-none border-2 border-transparent hover:border-red-600">
+                       <Trash2 className="w-5 h-5" />
                      </button>
                   </td>
                 </tr>
@@ -191,16 +271,15 @@ export default function Financials() {
             </tbody>
           </table>
         </div>
-        {txs.length === 0 && (
-          <div className="p-24 text-center space-y-4">
-             <div className="w-20 h-20 bg-bg border-4 border-dashed border-brand/10 mx-auto flex items-center justify-center rounded-full">
-              <DollarSign className="w-10 h-10 text-gray-200" />
+        {filteredTxs.length === 0 && (
+          <div className="p-32 text-center space-y-8 bg-white">
+             <div className="w-24 h-24 bg-bg border-4 border-dashed border-brand/20 mx-auto flex items-center justify-center rotate-12 group-hover:rotate-0 transition-transform">
+              <DollarSign className="w-12 h-12 text-gray-200" />
             </div>
-             <div className="text-sm uppercase tracking-[0.4em] font-black text-gray-300 italic">ЖУРНАЛ ТЕХНИЧЕСКИ ПУСТ</div>
+             <div className="text-lg uppercase tracking-[0.6em] font-black text-gray-300 italic">НУЛЕВОЙ БАЛАНС // ОПЕРАЦИИ НЕ ЗАФИКСИРОВАНЫ</div>
           </div>
         )}
       </div>
     </div>
-
   );
 }

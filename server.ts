@@ -59,6 +59,49 @@ async function startServer() {
     const chat_id = message.chat.id;
     const text = message.text;
 
+    // Handle Commands
+    if (text === "/start" || text === "/register") {
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id,
+          text: "👋 Привет! Я ваш ассистент BuildSync.\n\nДля регистрации и привязки вашего аккаунта, пожалуйста, поделитесь вашим номером телефона, нажав на кнопку ниже.",
+          reply_markup: {
+            keyboard: [[{ text: "📲 Поделиться контактом", request_contact: true }]],
+            one_time_keyboard: true,
+            resize_keyboard: true
+          }
+        })
+      });
+      return res.status(200).send("OK");
+    }
+
+    // Handle Shared Contacts
+    if (message.contact) {
+      const contact = message.contact;
+      await addDoc(collection(db, "registrations"), {
+        telegramId: String(contact.user_id || chat_id),
+        phoneNumber: contact.phone_number,
+        firstName: contact.first_name || "",
+        lastName: contact.last_name || "",
+        createdAt: serverTimestamp()
+      });
+
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id,
+          text: `✅ Спасибо! Ваш номер ${contact.phone_number} зарегистрирован в системе.\n\nТеперь вы можете отправлять мне задачи, контакты и отчеты об объектах.`,
+          reply_markup: { remove_keyboard: true }
+        })
+      });
+      return res.status(200).send("OK");
+    }
+
+    if (!text) return res.status(200).send("OK");
+
     try {
       // Use Gemini to parse the natural language input
       const prompt = `
