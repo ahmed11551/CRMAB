@@ -54,6 +54,35 @@ async function startServer() {
   // AI Initialization
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const genAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
+  const telegramToken = process.env.TELEGRAM_BOT_TOKEN || "8725593924:AAFbIhgcc04zvpQKH1inaK2c4ndgSrUPKso";
+
+  // Health Check
+  app.get("/api/health", async (req, res) => {
+    let telegramStatus = "Unknown";
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${telegramToken}/getMe`);
+      const data = await response.json();
+      telegramStatus = data.ok ? `Verified (${data.result.username})` : `Error: ${data.description}`;
+    } catch (e) {
+      telegramStatus = "Connection Failed";
+    }
+
+    res.json({
+      status: "ok",
+      firebase: {
+        client: !!db,
+        admin: !!adminDb,
+        databaseId: firebaseConfig.firestoreDatabaseId
+      },
+      ai: {
+        configured: !!genAI
+      },
+      telegram: {
+        tokenConfigured: !!telegramToken,
+        tokenStatus: telegramStatus
+      }
+    });
+  });
 
   // API Route for AI Summaries
   app.post("/api/ai/summarize", async (req, res) => {
@@ -61,8 +90,8 @@ async function startServer() {
       if (!genAI) throw new Error("GEMINI_API_KEY is not configured");
       const { logs } = req.body;
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const response = await model.generateContent(`Summarize the following communication logs for a construction project and suggest next steps:\n\n${logs}`);
-      res.json({ summary: response.response.text() });
+      const result = await model.generateContent(`Summarize the following communication logs for a construction project and suggest next steps:\n\n${logs}`);
+      res.json({ summary: result.response.text() });
     } catch (error) {
       console.error("AI Summary Error:", error);
       res.status(500).json({ error: "Failed to generate summary" });
@@ -71,7 +100,7 @@ async function startServer() {
 
   // Telegram Bot Webhook
   app.post("/api/telegram/webhook", async (req, res) => {
-    const token = process.env.TELEGRAM_BOT_TOKEN || "8725593924:AAFbIhgcc04zvpQKH1inaK2c4ndgSrUPKso";
+    const token = telegramToken;
     console.log("Webhook received body:", JSON.stringify(req.body));
 
     if (!token) {
@@ -235,7 +264,7 @@ async function startServer() {
 
   // Helper route to set the webhook
   app.get("/api/telegram/setup", async (req, res) => {
-    const token = process.env.TELEGRAM_BOT_TOKEN || "8725593924:AAFbIhgcc04zvpQKH1inaK2c4ndgSrUPKso";
+    const token = telegramToken;
     
     let appUrl = process.env.APP_URL;
     if (!appUrl || appUrl === "MY_APP_URL" || appUrl.includes('localhost')) {
@@ -281,6 +310,11 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    console.log("Firebase Client DB Initialized:", !!db);
+    console.log("Firebase Admin DB Initialized:", !!adminDb);
+    console.log("Gemini AI Initialized:", !!genAI);
+    console.log("Telegram Token Configured:", !!telegramToken);
+    console.log("Telegram Token Start:", telegramToken.substring(0, 10) + "...");
   });
 }
 

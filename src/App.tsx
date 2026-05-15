@@ -33,6 +33,7 @@ import CommunicationLogs from './components/CommunicationLogs.tsx';
 import Financials from './components/Financials.tsx';
 import TravelLogs from './components/TravelLogs.tsx';
 import Registrations from './components/Registrations.tsx';
+import ReminderOverlay from './components/ReminderOverlay.tsx';
 
 type Section = 'dashboard' | 'contacts' | 'projects' | 'tasks' | 'communication' | 'financials' | 'travel' | 'registrations';
 
@@ -113,11 +114,15 @@ export default function App() {
 
           <button 
             onClick={handleLogin}
-            className="w-full bg-brand text-white py-5 px-8 hover:bg-gray-800 transition-all flex items-center justify-center gap-3 group font-black tracking-widest uppercase italic neo-shadow-sm active:translate-x-1 active:translate-y-1 active:shadow-none mb-8 relative z-10"
+            className="w-full bg-brand text-white py-5 px-8 hover:bg-gray-800 transition-all flex items-center justify-center gap-3 group font-black tracking-widest uppercase italic neo-shadow-sm active:translate-x-1 active:translate-y-1 active:shadow-none mb-4 relative z-10"
           >
             Войти через Google
             <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
           </button>
+
+          <p className="text-[10px] text-center mb-10 font-bold uppercase italic text-red-600 bg-red-50 p-3 border-2 border-red-200">
+            ⚠️ Если окно входа не открывается, нажмите кнопку "Открыть в новом окне" в правом верхнем углу экрана.
+          </p>
 
           <div className="space-y-4 p-5 bg-gray-50 border-2 border-dashed border-brand/20 relative z-10">
              <h4 className="text-[10px] font-black uppercase tracking-widest text-brand italic">Как это работает?</h4>
@@ -266,6 +271,7 @@ export default function App() {
               {activeSection === 'registrations' && <Registrations />}
             </motion.div>
           </AnimatePresence>
+          <ReminderOverlay />
         </div>
 
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t-2 border-brand flex items-center justify-around h-20 px-4 z-30 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">

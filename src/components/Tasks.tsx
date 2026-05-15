@@ -19,7 +19,8 @@ export default function Tasks() {
     assignedTo: '', 
     projectId: '', 
     priority: 'Medium', 
-    status: 'Pending' 
+    status: 'Pending',
+    reminderAt: ''
   });
 
   useEffect(() => {
@@ -67,10 +68,11 @@ export default function Tasks() {
     try {
       await addDoc(collection(db, path), {
         ...newTask,
+        reminderDismissed: false,
         createdAt: serverTimestamp()
       });
       setIsAdding(false);
-      setNewTask({ title: '', description: '', assignedTo: '', projectId: '', priority: 'Medium', status: 'Pending' });
+      setNewTask({ title: '', description: '', assignedTo: '', projectId: '', priority: 'Medium', status: 'Pending', reminderAt: '' });
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, path);
     }
@@ -198,6 +200,15 @@ export default function Tasks() {
                     <option value="Urgent">Критичный</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-[10px] md:text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2">Напоминание (Дата и время)</label>
+                  <input 
+                    type="datetime-local" 
+                    value={newTask.reminderAt} 
+                    onChange={e => setNewTask({...newTask, reminderAt: e.target.value})} 
+                    className="w-full bg-bg border-2 border-brand p-4 text-sm italic font-bold focus:bg-white transition-colors outline-none cursor-text" 
+                  />
+                </div>
                 <div className="flex gap-4 md:gap-8 pt-0 md:pt-6">
                    <button type="submit" className="flex-1 bg-brand text-white py-5 md:py-4 text-xs font-black uppercase tracking-[0.2em] italic active:scale-95 transition-all neo-shadow-sm">РАЗВЕРНУТЬ</button>
                    <button type="button" onClick={() => setIsAdding(false)} className="flex-1 border-2 border-brand py-5 md:py-4 text-xs font-black uppercase tracking-[0.2em] italic hover:bg-gray-100 transition-colors">ОТМЕНА</button>
@@ -259,6 +270,26 @@ export default function Tasks() {
                       <Construction className="w-4 h-4 text-brand" />
                       <span className="truncate">{projects.find(p => p.id === task.projectId)?.name || 'БЕЗ ОБЪЕКТА'}</span>
                    </div>
+                   {task.reminderAt && (
+                     <div className="flex items-center gap-2.5 bg-brand/5 p-2 border border-brand/10 text-brand group/reminder">
+                        <AlertCircle className="w-4 h-4" />
+                        <span className="truncate">Напомнить: {new Date(task.reminderAt).toLocaleString()}</span>
+                        <button 
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await updateDoc(doc(db, 'tasks', task.id), { reminderAt: '', reminderDismissed: false });
+                            } catch (err) {
+                              handleFirestoreError(err, OperationType.UPDATE, `tasks/${task.id}`);
+                            }
+                          }}
+                          className="ml-auto opacity-0 group-hover/reminder:opacity-100 transition-opacity p-1 hover:bg-brand/10 rounded"
+                          title="Удалить напоминание"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                     </div>
+                   )}
                    <div className="hidden md:flex items-center gap-2.5 ml-auto italic border-l-2 border-brand/10 pl-6">
                       <Clock className="w-4 h-4" />
                       {task.createdAt ? new Date((task.createdAt as any).toDate()).toLocaleDateString() : 'Н/Д'}

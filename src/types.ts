@@ -40,6 +40,8 @@ export interface CRMTask {
   status: TaskStatus;
   priority: Priority;
   dueDate?: string;
+  reminderAt?: string; // ISO string with time
+  reminderDismissed?: boolean;
   createdAt: string;
 }
 

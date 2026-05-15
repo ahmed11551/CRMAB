@@ -17,10 +17,20 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (s: any) => voi
   const [recentTravel, setRecentTravel] = useState<TravelLog[]>([]);
   const [recentComms, setRecentComms] = useState<Communication[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [healthStatus, setHealthStatus] = useState<any>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     
+    const fetchHealth = async () => {
+      try {
+        const resp = await fetch('/api/health');
+        const data = await resp.json();
+        setHealthStatus(data);
+      } catch (e) { console.error("Health check failed"); }
+    };
+    fetchHealth();
+    const healthInterval = setInterval(fetchHealth, 10000);
     const unsubscribeProjects = onSnapshot(collection(db, 'projects'), (s) => {
       setStats(prev => ({ ...prev, projects: s.size }));
     }, (error) => handleFirestoreError(error, OperationType.GET, 'projects'));
@@ -60,6 +70,7 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (s: any) => voi
 
     return () => {
       clearInterval(timer);
+      clearInterval(healthInterval);
       unsubscribeProjects();
       unsubscribeContacts();
       unsubscribeTasks();
@@ -109,13 +120,30 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (s: any) => voi
            </button>
            <div className="flex-1 md:flex-none bg-brand text-white px-8 py-4 text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-center italic shadow-xl flex items-center gap-2">
             <Zap className="w-4 h-4 fill-current" />
-            СТАТУС: НОМИНАЛЬНЫЙ
+            СТАТУС: {healthStatus?.status === 'ok' ? 'НОМИНАЛЬНЫЙ' : 'ИНИЦИАЛИЗАЦИЯ...'}
            </div>
         </div>
         <div className="absolute top-0 right-0 opacity-[0.02] pointer-events-none -translate-y-1/2 translate-x-1/2">
           <Construction className="w-[600px] h-[600px]" />
         </div>
       </div>
+
+      {healthStatus && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white border-4 border-brand p-4 neo-shadow-sm italic font-black uppercase text-[9px] tracking-widest">
+           <div className="flex items-center gap-3">
+             <div className={`w-3 h-3 rounded-full ${healthStatus.firebase?.admin ? 'bg-green-500' : 'bg-red-500'}`}></div>
+             БАЗА ДАННЫХ: {healthStatus.firebase?.admin ? 'ПОДКЛЮЧЕНО' : 'ОШИБКА'}
+           </div>
+           <div className="flex items-center gap-3">
+             <div className={`w-3 h-3 rounded-full ${healthStatus.telegram?.tokenStatus?.includes('Verified') ? 'bg-green-500' : 'bg-red-500'}`}></div>
+             ТГ БОТ: {healthStatus.telegram?.tokenStatus || 'ПРОВЕРКА...'}
+           </div>
+           <div className="flex items-center gap-3">
+             <div className={`w-3 h-3 rounded-full ${healthStatus.ai?.configured ? 'bg-green-500' : 'bg-red-500'}`}></div>
+             AI ЯДРО: {healthStatus.ai?.configured ? 'АКТИВНО' : 'НЕ НАСТРОЕНО'}
+           </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
          {[
