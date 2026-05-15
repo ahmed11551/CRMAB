@@ -128,13 +128,31 @@ export default function Contacts() {
               </button>
             )}
          </div>
-         <button 
-           onClick={() => setGroupByRole(!groupByRole)}
-           className={`px-8 py-4 border-2 border-brand flex items-center justify-center gap-3 text-xs font-black uppercase tracking-[0.2em] italic transition-all neo-shadow-sm hover:shadow-none ${groupByRole ? 'bg-brand text-white' : 'bg-white'}`}
-         >
-           <Filter className="w-4 h-4" />
-           {groupByRole ? 'СНЯТЬ ГРУППИРОВКУ' : 'ГРУППИРОВАТЬ ПО РОЛЯМ'}
-         </button>
+         <div className="flex gap-4">
+           <div className="hidden md:flex gap-2">
+             {Object.keys(roleMap).map(role => (
+               <button 
+                 key={role}
+                 onClick={() => {
+                   setGroupByRole(true);
+                   setExpandedGroups(prev => ({ ...prev, [role]: true }));
+                   const el = document.getElementById(`group-${role}`);
+                   el?.scrollIntoView({ behavior: 'smooth' });
+                 }}
+                 className="px-4 py-4 border-2 border-brand/10 text-[9px] font-black uppercase tracking-widest italic hover:bg-brand hover:text-white transition-all hover:border-brand"
+               >
+                 {roleMap[role].toUpperCase()}
+               </button>
+             ))}
+           </div>
+           <button 
+             onClick={() => setGroupByRole(!groupByRole)}
+             className={`px-8 py-4 border-2 border-brand flex items-center justify-center gap-3 text-xs font-black uppercase tracking-[0.2em] italic transition-all neo-shadow-sm hover:shadow-none ${groupByRole ? 'bg-brand text-white' : 'bg-white'}`}
+           >
+             <Filter className="w-4 h-4" />
+             {groupByRole ? 'СНЯТЬ ГРУППИРОВКУ' : 'ГРУППИРОВАТЬ'}
+           </button>
+         </div>
       </div>
 
       {isAdding && (
@@ -192,7 +210,7 @@ export default function Contacts() {
 
       <div className="space-y-12">
         {(Object.entries(groupedContacts) as [string, Contact[]][]).map(([role, members]) => (
-          <div key={role} className="space-y-6">
+          <div key={role} id={`group-${role}`} className="space-y-6 scroll-mt-32">
             {groupByRole && (
               <button 
                 onClick={() => toggleGroup(role)}

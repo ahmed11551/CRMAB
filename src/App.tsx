@@ -32,8 +32,9 @@ import Tasks from './components/Tasks.tsx';
 import CommunicationLogs from './components/CommunicationLogs.tsx';
 import Financials from './components/Financials.tsx';
 import TravelLogs from './components/TravelLogs.tsx';
+import Registrations from './components/Registrations.tsx';
 
-type Section = 'dashboard' | 'contacts' | 'projects' | 'tasks' | 'communication' | 'financials' | 'travel';
+type Section = 'dashboard' | 'contacts' | 'projects' | 'tasks' | 'communication' | 'financials' | 'travel' | 'registrations';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -54,16 +55,37 @@ export default function App() {
       const result = await signInWithPopup(auth, new GoogleAuthProvider());
       if (result.user) {
         console.log("Logged in:", result.user.email);
+        
+        // Sync user profile to Firestore
+        const { doc, setDoc, getDoc, serverTimestamp } = await import('firebase/firestore');
+        const userRef = doc(db, 'users', result.user.uid);
+        
+        // Only set if it doesn't exist or needs update
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) {
+          await setDoc(userRef, {
+            uid: result.user.uid,
+            displayName: result.user.displayName,
+            email: result.user.email,
+            photoURL: result.user.photoURL,
+            createdAt: serverTimestamp(),
+            role: 'User'
+          }, { merge: true });
+        }
       }
     } catch (err: any) {
       console.error("Login failed:", err);
+      let errorMsg = "Ошибка входа. ";
       if (err.code === 'auth/popup-closed-by-user') {
-        alert("Окно авторизации было закрыто. Пожалуйста, попробуйте снова и завершите вход.");
+        errorMsg += "Окно авторизации было закрыто. Пожалуйста, завершите вход в появившемся окне.";
       } else if (err.code === 'auth/cancelled-popup-request') {
-        // Ignore duplicate popup requests
+        return; // Ignore duplicate popup requests
+      } else if (err.code === 'auth/popup-blocked') {
+        errorMsg += "Всплывающее окно заблокировано вашим браузером. Пожалуйста, разрешите всплывающие окна для этого сайта.";
       } else {
-        alert("Ошибка входа: " + err.message + "\nПопробуйте открыть приложение в новом окне.");
+        errorMsg += err.message + "\nПопробуйте открыть приложение в новом окне (кнопка в правом верхнем углу).";
       }
+      alert(errorMsg);
     }
   };
 
@@ -126,6 +148,7 @@ export default function App() {
     { id: 'communication', label: 'Связь', icon: MessageSquare },
     { id: 'financials', label: 'Финансы', icon: DollarSign },
     { id: 'travel', label: 'Поездки', icon: Plane },
+    { id: 'registrations', label: 'Регистрации ТГ', icon: Users },
   ];
 
   return (
@@ -240,6 +263,7 @@ export default function App() {
               {activeSection === 'communication' && <CommunicationLogs />}
               {activeSection === 'financials' && <Financials />}
               {activeSection === 'travel' && <TravelLogs />}
+              {activeSection === 'registrations' && <Registrations />}
             </motion.div>
           </AnimatePresence>
         </div>
